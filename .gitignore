@@ -1,0 +1,8 @@
+.idea
+.tox
+.venv
+.pytest_cache
+.mypy_cache
+src/scietex.hal.vfd.egg-info
+.coverage
+htmlcov

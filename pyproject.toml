@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scietex.hal.vfd"
+dynamic = ["version"]
+description = "Scietex VFD HAL package"
+authors = [
+  { name = "Anton Bondarenko", email = "bond.anton@gmail.com" },
+]
+license = { file = "LICENSE" }
+readme = "README.md"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.9"
+dependencies = [
+    "msgspec[yaml] ~= 0.19.0",
+    "scietex.hal.serial >= 1.0.0, < 2.0.0",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/bond-anton/scietex.hal.vfd"
+"Bug Tracker" = "https://github.com/bond-anton/scietex.hal.vfd/issues"
+
+[project.optional-dependencies]
+dev = []
+test = ["flake8", "pytest", "pytest-asyncio"]
+lint = ["pylint"]
+
+[tool.setuptools.dynamic]
+version = {attr = "scietex.hal.vfd.version.__version__"}
+
+[tool.setuptools.package-data]
+"scietex.hal.vfd" = ["py.typed"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 100
+
+[tool.mypy]
+python_version = "3.9"
+
+[tool.pytest.ini_options]
+pythonpath = [
+  "src"
+]
