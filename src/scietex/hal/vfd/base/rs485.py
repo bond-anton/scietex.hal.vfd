@@ -83,7 +83,7 @@ class VFD(RS485Client):
         """Start the VFD"""
         self.logger.debug("%s: Start (freewheel: %s)", self.label, freewheel)
 
-    async def read_data(self):
+    async def read_data(self) -> dict[str, Union[int, float, list[Union[int, float]]]]:
         parameters = await self.read_parameters()
         return {f: getattr(parameters, f) for f in parameters.__struct_fields__}
 
