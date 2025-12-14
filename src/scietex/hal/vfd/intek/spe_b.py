@@ -1,6 +1,6 @@
 """Intek SPE-B VFD RS485 control routines"""
 
-from typing import Union, Optional
+from typing import Optional
 from logging import Logger
 
 from scietex.hal.serial import SerialConnectionConfig, ModbusSerialConnectionConfig
@@ -70,7 +70,7 @@ class SPEvB(VFD):
     # pylint: disable=duplicate-code
     def __init__(
         self,
-        con_params: Union[SerialConnectionConfig, ModbusSerialConnectionConfig],
+        con_params: SerialConnectionConfig | ModbusSerialConnectionConfig,
         address: int = 1,
         label: str = "VFD",
         logger: Optional[Logger] = None,

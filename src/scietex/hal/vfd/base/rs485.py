@@ -1,6 +1,6 @@
 """Basic VD device prototype class to be inherited by particular implementations."""
 
-from typing import Union, Optional, Any
+from typing import Optional, Any
 from logging import Logger
 
 from scietex.hal.serial import RS485Client, SerialConnectionConfig, ModbusSerialConnectionConfig
@@ -15,7 +15,7 @@ class VFD(RS485Client):
 
     def __init__(
         self,
-        con_params: Union[SerialConnectionConfig, ModbusSerialConnectionConfig],
+        con_params: SerialConnectionConfig | ModbusSerialConnectionConfig,
         address: int = 1,
         label: str = "VFD",
         logger: Optional[Logger] = None,
@@ -83,7 +83,7 @@ class VFD(RS485Client):
         """Start the VFD"""
         self.logger.debug("%s: Start (freewheel: %s)", self.label, freewheel)
 
-    async def read_data(self) -> dict[str, Union[int, float, list[Union[int, float]]]]:
+    async def read_data(self) -> dict[str, int | float | list[int | float]]:
         parameters = await self.read_parameters()
         return {f: getattr(parameters, f) for f in parameters.__struct_fields__}
 
