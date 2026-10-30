@@ -1,6 +1,19 @@
-"""VFD data structures."""
+"""VFD data structures.
+
+:class:`VFDParameters` names the operating frequency ``frequency_hz`` so it
+cannot be confused with ``frequency_percent``, which is the unit some drives
+report natively. The two frequency fields are the only ones guaranteed to be
+populated; every other field is optional and stays ``None`` when the drive's
+protocol does not expose it.
+
+``None`` and ``0.0`` mean different things throughout this module: ``None`` is
+"this drive does not report the value", ``0.0`` is "the drive reports zero".
+A caller that plots a temperature must check for ``None`` rather than treating
+a missing reading as a cold drive.
+"""
 
 from enum import Enum
+
 import msgspec
 
 
@@ -12,12 +25,11 @@ class VFDState(Enum):
     RUNNING_FORWARD = 2
     RUNNING_BACKWARD = 3  # or RUNNING_REVERSE
 
-    def __str__(self):
+    def __str__(self) -> str:
         """Return a human-readable string representation."""
         return self.name.replace("_", " ").title()
 
 
-# pylint: disable=too-few-public-methods
 class VFDError(msgspec.Struct, frozen=True):
     """Model of a VFD error with code and message."""
 
@@ -28,29 +40,51 @@ class VFDError(msgspec.Struct, frozen=True):
         return f"VFDError(code={self.code}, message='{self.message}')"
 
 
-# pylint: disable=too-few-public-methods
 class VFDParameters(msgspec.Struct, frozen=True):
-    """Model for VFD operational parameters."""
+    """Model for VFD operational parameters.
 
-    frequency: float  # Current operating frequency in Hz
+    Attributes:
+        frequency_hz: Output frequency in Hz.
+        frequency_percent: Output frequency as a percentage of the configured
+            maximum, 0-100.
+        output_current: Output current in Amps.
+        output_voltage: Output voltage in Volts.
+        output_power: Output power in kW.
+        dc_bus_voltage: DC bus (link) voltage in Volts, or ``None`` when the
+            drive does not report it.
+        heatsink_temperature_c: Power-module or heatsink temperature in degrees
+            Celsius, or ``None`` when the drive does not report it. A drive that
+            signals overheat only through a fault code reports ``None`` here:
+            a fault is not a temperature.
+        motor_temperature_c: Motor winding or PTC temperature in degrees
+            Celsius, or ``None`` when the drive does not report it.
+        state: Current VFD state.
+    """
+
+    frequency_hz: float  # Current operating frequency in Hz
     frequency_percent: float  # Frequency as a percentage of max (0-100%)
     output_current: float = 0.0  # Output current in Amps
     output_voltage: float = 0.0  # Output voltage in Volts
     output_power: float = 0.0  # Output power in kW
+    dc_bus_voltage: float | None = None  # DC bus voltage in Volts
+    heatsink_temperature_c: float | None = None  # Power-module temperature, deg C
+    motor_temperature_c: float | None = None  # Motor temperature, deg C
     state: VFDState = VFDState.STOPPED  # Current VFD state
 
     def __str__(self) -> str:
         return (
-            f"VFDParameters(frequency={self.frequency} Hz, "
+            f"VFDParameters(frequency={self.frequency_hz} Hz, "
             f"frequency_percent={self.frequency_percent}%, "
             f"current={self.output_current} A, "
             f"voltage={self.output_voltage} V, "
             f"power={self.output_power} kW, "
+            f"dc_bus={self.dc_bus_voltage} V, "
+            f"heatsink={self.heatsink_temperature_c} C, "
+            f"motor={self.motor_temperature_c} C, "
             f"state={self.state})"
         )
 
 
-# pylint: disable=too-few-public-methods
 class VFDStartCMD(msgspec.Struct, frozen=True):
     """VFD start command."""
 
@@ -61,7 +95,6 @@ class VFDStartCMD(msgspec.Struct, frozen=True):
         return f"VFDStartCMD(forward={self.forward}, slow={self.slow})"
 
 
-# pylint: disable=too-few-public-methods
 class VFDStopCMD(msgspec.Struct, frozen=True):
     """VFD stop command."""
 
@@ -71,7 +104,6 @@ class VFDStopCMD(msgspec.Struct, frozen=True):
         return f"VFDStopCMD(freewheel={self.freewheel})"
 
 
-# pylint: disable=too-few-public-methods
 class VFDClearErrorCMD(msgspec.Struct, frozen=True):
     """VFD clear error command."""
 
@@ -79,3 +111,12 @@ class VFDClearErrorCMD(msgspec.Struct, frozen=True):
 
     def __str__(self) -> str:
         return f"VFDClearErrorCMD(communication={self.communication})"
+
+
+class VFDSetFrequencyCMD(msgspec.Struct, frozen=True):
+    """VFD frequency setpoint command."""
+
+    frequency_hz: float = 0.0
+
+    def __str__(self) -> str:
+        return f"VFDSetFrequencyCMD(frequency_hz={self.frequency_hz})"

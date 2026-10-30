@@ -1,27 +1,41 @@
-"""Basic VD device prototype class to be inherited by particular implementations."""
+"""Basic VFD device prototype class to be inherited by particular implementations."""
 
-from typing import Optional, Any
 from logging import Logger
+from typing import Any
 
-from scietex.hal.serial import RS485Client, SerialConnectionConfig, ModbusSerialConnectionConfig
+from scietex.hal.serial import (
+    ModbusSerialConnectionConfig,
+    RS485Client,
+    SerialConnectionConfig,
+)
 
-from .data import VFDError, VFDState, VFDParameters, VFDStartCMD, VFDStopCMD
+from .capabilities import VFDCapabilities
+from .data import (
+    VFDClearErrorCMD,
+    VFDError,
+    VFDParameters,
+    VFDSetFrequencyCMD,
+    VFDStartCMD,
+    VFDState,
+    VFDStopCMD,
+)
+from .protocol import VFDProtocol
 
 
-class VFD(RS485Client):
+class VFD(RS485Client, VFDProtocol):
     """VFD control base class"""
 
-    # pylint: disable=too-many-public-methods
+    capabilities = VFDCapabilities()
+    display_name = "VFD"
 
     def __init__(
         self,
         con_params: SerialConnectionConfig | ModbusSerialConnectionConfig,
         address: int = 1,
         label: str = "VFD",
-        logger: Optional[Logger] = None,
+        logger: Logger | None = None,
         **kwargs,
     ):
-        # pylint: disable=too-many-arguments
         super().__init__(
             con_params=con_params,
             address=address,
@@ -31,6 +45,10 @@ class VFD(RS485Client):
         )
         self.error_codes: dict[int, VFDError] = {0: VFDError(code=0, message="No error")}
         self.error_codes_com: dict[int, VFDError] = {0: VFDError(code=0, message="No error")}
+
+    async def connect(self) -> None:
+        """Nothing to do: the serial client opens the port once per operation."""
+        self.logger.debug("%s: Connect (per-operation serial client).", self.label)
 
     # Errors processing methods
     async def read_error_code(self, comm: bool = False) -> int:
@@ -58,17 +76,17 @@ class VFD(RS485Client):
             self.logger.debug("%s: Clear communication error.", self.label)
         else:
             self.logger.debug("%s: Clear error.", self.label)
-        return await self.read_error_code()
+        return await self.read_error_code(comm)
 
     # Parameters monitoring methods
     async def read_parameters(self) -> VFDParameters:
-        """Start the VFD"""
-        parameters = VFDParameters(frequency=0.0, frequency_percent=0.0)
+        """Read the VFD operating parameters"""
+        parameters = VFDParameters(frequency_hz=0.0, frequency_percent=0.0)
         self.logger.debug("%s: %s", self.label, parameters)
         return parameters
 
     async def read_state(self) -> VFDState:
-        """Start the VFD"""
+        """Read the VFD run state"""
         state = VFDState.UNKNOWN
         self.logger.debug("%s: Current state: %s", self.label, state)
         return state
@@ -78,12 +96,23 @@ class VFD(RS485Client):
         """Start the VFD"""
         self.logger.debug("%s: Start (forward: %s, slow: %s)", self.label, forward, slow)
 
-    # pylint: disable=unused-argument
     async def stop(self, freewheel: bool = False) -> None:
-        """Start the VFD"""
-        self.logger.debug("%s: Start (freewheel: %s)", self.label, freewheel)
+        """Stop the VFD"""
+        self.logger.debug("%s: Stop (freewheel: %s)", self.label, freewheel)
 
-    async def read_data(self) -> dict[str, int | float | list[int | float]]:
+    async def set_frequency(self, frequency_hz: float) -> None:
+        """Set the VFD frequency setpoint"""
+        self.logger.debug("%s: Set frequency %s Hz.", self.label, frequency_hz)
+
+    async def read_data(self) -> dict[str, Any]:
+        """
+        Read the VFD operating parameters as a plain dictionary.
+
+        The return type is widened to ``Any`` because `VFDParameters` carries
+        optional fields (temperatures, DC bus voltage) that are ``None`` when the
+        drive does not report them, which the inherited `RS485Client` signature
+        does not allow.
+        """
         parameters = await self.read_parameters()
         return {f: getattr(parameters, f) for f in parameters.__struct_fields__}
 
@@ -107,4 +136,18 @@ class VFD(RS485Client):
                         pass
                 await self.stop(freewheel=stop_params.freewheel)
             elif message["cmd"] == "clear_error":
-                await self.clear_error()
+                clear_params = VFDClearErrorCMD()
+                if "data" in message:
+                    try:
+                        clear_params = VFDClearErrorCMD(**message["data"])
+                    except (TypeError, ValueError):
+                        pass
+                await self.clear_error(comm=clear_params.communication)
+            elif message["cmd"] == "set_frequency":
+                frequency_params = VFDSetFrequencyCMD()
+                if "data" in message:
+                    try:
+                        frequency_params = VFDSetFrequencyCMD(**message["data"])
+                    except (TypeError, ValueError):
+                        pass
+                await self.set_frequency(frequency_hz=frequency_params.frequency_hz)

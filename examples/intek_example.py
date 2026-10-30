@@ -3,6 +3,7 @@
 import asyncio
 
 from scietex.hal.serial import ModbusSerialConnectionConfig
+
 from scietex.hal.vfd.intek import SPEvB
 
 

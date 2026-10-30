@@ -19,17 +19,28 @@ classifiers = [
 requires-python = ">=3.10"
 dependencies = [
     "msgspec[yaml] ~= 0.20.0",
-    "scietex.hal.serial >= 1.1.0, < 2.0.0",
+    "scietex.hal.serial >= 2.4.0, < 3.0.0",
+    "pymodbus ~= 3.15",
 ]
+
+[project.entry-points."scietex.hal.vfd.drivers"]
+intek_spe_b_modbus = "scietex.hal.vfd.intek.spe_b:IntekSPEBModbusVFD"
+vesper_e5_8200_modbus = "scietex.hal.vfd.vesper.e5_8200:VesperE58200ModbusVFD"
+vesper_e4_8400_modbus = "scietex.hal.vfd.vesper.e4_8400:VesperE48400ModbusVFD"
+
+[project.entry-points."scietex.modbus.drivers"]
+intek_spe_b = "scietex.hal.vfd.modbus_drivers:intek_spe_b"
+vesper_e5_8200 = "scietex.hal.vfd.modbus_drivers:vesper_e5_8200"
+vesper_e4_8400 = "scietex.hal.vfd.modbus_drivers:vesper_e4_8400"
 
 [project.urls]
 "Homepage" = "https://github.com/bond-anton/scietex.hal.vfd"
 "Bug Tracker" = "https://github.com/bond-anton/scietex.hal.vfd/issues"
 
 [project.optional-dependencies]
-dev = []
-test = ["flake8", "pytest", "pytest-asyncio"]
-lint = ["pylint"]
+dev = ["tox>=4.46.0"]
+test = ["pytest", "pytest-asyncio", "pytest-xdist"]
+lint = ["ruff", "ty"]
 
 [tool.setuptools.dynamic]
 version = {attr = "scietex.hal.vfd.version.__version__"}
@@ -39,12 +50,6 @@ version = {attr = "scietex.hal.vfd.version.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.black]
-line-length = 100
-
-[tool.mypy]
-python_version = "3.10"
 
 [tool.pytest.ini_options]
 pythonpath = [
