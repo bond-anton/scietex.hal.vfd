@@ -198,13 +198,19 @@ class VesperE48400(VFD):
         temperature are read separately because the gaps between them would
         otherwise pull in reserved registers.
 
+        The three separate readings and the run state are optional: a drive that
+        refuses one of them still reports its frequency and current, so the
+        affected field stays ``None`` (or ``VFDState.UNKNOWN``) instead of
+        failing the whole snapshot.
+
         Returns:
             VFDParameters: The decoded parameters. ``heatsink_temperature_c`` is
                 populated from U1-46; ``motor_temperature_c`` stays ``None``
                 because the drive reports motor overheat only as a fault.
 
         Raises:
-            ModbusOperationError: If any read fails.
+            ModbusOperationError: If the measurement block or E1-04 cannot be
+                read.
         """
         await self._read_max_frequency()
         block = await self.read_registers(
@@ -218,9 +224,9 @@ class VesperE48400(VFD):
             )
         offset = registers.PARAMETERS_BLOCK_ADDRESS
         frequency_hz = registers.output_frequency_hz(block[registers.REG_OUTPUT_FREQUENCY - offset])
-        voltage = await self.read_register(registers.REG_OUTPUT_VOLTAGE, holding=True)
-        dc_bus = await self.read_register(registers.REG_DC_BUS_VOLTAGE, holding=True)
-        temperature = await self.read_register(registers.REG_HEATSINK_TEMPERATURE, holding=True)
+        voltage = await self._read_optional_register(registers.REG_OUTPUT_VOLTAGE)
+        dc_bus = await self._read_optional_register(registers.REG_DC_BUS_VOLTAGE)
+        temperature = await self._read_optional_register(registers.REG_HEATSINK_TEMPERATURE)
         return VFDParameters(
             frequency_hz=frequency_hz,
             frequency_percent=self._percent(frequency_hz),
@@ -239,7 +245,7 @@ class VesperE48400(VFD):
             VFDState: The decoded state, or ``VFDState.UNKNOWN`` if the status
                 register cannot be read.
         """
-        status = await self.read_register(registers.REG_STATUS, holding=True)
+        status = await self._read_optional_register(registers.REG_STATUS)
         if status is None:
             return VFDState.UNKNOWN
         return registers.status_to_state(status)

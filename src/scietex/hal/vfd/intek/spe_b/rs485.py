@@ -135,7 +135,7 @@ class SPEvB(VFD):
 
     async def read_state(self) -> VFDState:
         """Read the VFD run state"""
-        status = await self.read_register(registers.REG_STATUS, holding=True)
+        status = await self._read_optional_register(registers.REG_STATUS)
         if status is None:
             return VFDState.UNKNOWN
         return registers.status_to_state(status)

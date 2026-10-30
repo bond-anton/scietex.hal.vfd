@@ -133,11 +133,15 @@ class VesperE58200(VFD):
         field stays 0.0, and no temperature, so both temperature fields stay
         ``None``.
 
+        The run state is read separately and is optional: a drive that refuses
+        the monitor register still reports its measurements, so the state falls
+        back to ``VFDState.UNKNOWN`` instead of failing the whole snapshot.
+
         Returns:
             VFDParameters: The decoded parameters.
 
         Raises:
-            ModbusOperationError: If the block cannot be read.
+            ModbusOperationError: If the measurement block cannot be read.
         """
         block = await self.read_registers(
             registers.PARAMETERS_BLOCK_ADDRESS,
@@ -167,7 +171,7 @@ class VesperE58200(VFD):
             VFDState: The decoded state, or ``VFDState.UNKNOWN`` if the monitor
                 register cannot be read.
         """
-        monitor = await self.read_register(registers.REG_MONITOR, holding=True)
+        monitor = await self._read_optional_register(registers.REG_MONITOR)
         if monitor is None:
             return VFDState.UNKNOWN
         return registers.status_to_state(monitor)

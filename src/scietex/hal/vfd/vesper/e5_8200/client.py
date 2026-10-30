@@ -156,6 +156,31 @@ class VesperE58200ModbusVFD(VFDProtocol):
             )
         return list(response.registers)
 
+    async def _read_optional_registers(self, address: int, count: int) -> list[int] | None:
+        """
+        Read holding registers, returning ``None`` instead of raising on failure.
+
+        Used for readings that refine a snapshot but must not fail it: a drive
+        that refuses one diagnostic register still reports its frequency,
+        current and state, and a poll loop that raised on every optional read
+        would never publish anything.
+
+        Args:
+            address: Starting register address.
+            count: Number of registers to read.
+
+        Returns:
+            list[int] | None: The register values, or ``None`` when the read
+                failed.
+        """
+        try:
+            return await self._read_registers(address, count)
+        except ModbusOperationError as exc:
+            self.logger.warning(
+                "%s: Optional register %s is unreadable (%s).", self.label, address, exc
+            )
+            return None
+
     async def _write_register(self, address: int, value: int) -> None:
         """
         Write a single holding register, raising on a Modbus exception response.
@@ -198,11 +223,15 @@ class VesperE58200ModbusVFD(VFDProtocol):
         field stays 0.0, and no temperature, so both temperature fields stay
         ``None``.
 
+        The run state is read separately and is optional: a drive that refuses
+        the monitor register still reports its measurements, so the state falls
+        back to ``VFDState.UNKNOWN`` instead of failing the whole snapshot.
+
         Returns:
             VFDParameters: The decoded parameters.
 
         Raises:
-            ModbusOperationError: If the block cannot be read.
+            ModbusOperationError: If the measurement block cannot be read.
         """
         block = await self._read_registers(
             registers.PARAMETERS_BLOCK_ADDRESS, registers.PARAMETERS_BLOCK_COUNT
@@ -225,12 +254,12 @@ class VesperE58200ModbusVFD(VFDProtocol):
         Read the drive's run state.
 
         Returns:
-            VFDState: The decoded state.
-
-        Raises:
-            ModbusOperationError: If the monitor register cannot be read.
+            VFDState: The decoded state, or ``VFDState.UNKNOWN`` when the monitor
+                register is unreadable.
         """
-        raw = await self._read_registers(registers.REG_MONITOR, 1)
+        raw = await self._read_optional_registers(registers.REG_MONITOR, 1)
+        if raw is None:
+            return VFDState.UNKNOWN
         state = registers.status_to_state(raw[0])
         self.logger.debug("%s: Current state: %s", self.label, state)
         return state

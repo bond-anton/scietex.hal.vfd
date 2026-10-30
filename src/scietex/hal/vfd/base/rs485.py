@@ -4,6 +4,7 @@ from logging import Logger
 from typing import Any
 
 from scietex.hal.serial import (
+    ModbusOperationError,
     ModbusSerialConnectionConfig,
     RS485Client,
     SerialConnectionConfig,
@@ -115,6 +116,29 @@ class VFD(RS485Client, VFDProtocol):
         """
         parameters = await self.read_parameters()
         return {f: getattr(parameters, f) for f in parameters.__struct_fields__}
+
+    async def _read_optional_register(self, register: int) -> int | None:
+        """
+        Read one register, returning ``None`` instead of raising on failure.
+
+        Used for readings that refine a snapshot but must not fail it: a drive
+        that refuses one diagnostic register still reports its frequency,
+        current and state, and a poll loop that raised on every optional read
+        would never publish anything.
+
+        Args:
+            register: The holding register address.
+
+        Returns:
+            int | None: The register value, or ``None`` when the read failed.
+        """
+        try:
+            return await self.read_register(register, holding=True)
+        except ModbusOperationError as exc:
+            self.logger.warning(
+                "%s: Optional register %s is unreadable (%s).", self.label, register, exc
+            )
+            return None
 
     async def process_message(self, message: dict[str, Any]) -> None:
         await super().process_message(message)

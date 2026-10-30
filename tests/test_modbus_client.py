@@ -167,6 +167,34 @@ def test_read_parameters_reports_zero_hz_when_p010_is_zero():
     assert parameters.frequency_hz == pytest.approx(0.0)
 
 
+def test_read_parameters_survives_an_unreadable_status_register():
+    """A refused status read must not discard the measurements.
+
+    The poll loop publishes whatever `read_parameters` returns; raising here
+    would mean a drive that refuses one diagnostic register never reports its
+    frequency, current or voltage at all.
+    """
+    vfd, _ = _connected([_read([5000, 540, 380, 123, 45]), ExceptionResponse(function_code=3)])
+    parameters = asyncio.run(vfd.read_parameters())
+    assert parameters.frequency_hz == pytest.approx(25.0)
+    assert parameters.output_current == pytest.approx(1.23)
+    assert parameters.output_voltage == pytest.approx(380.0)
+    assert parameters.state is VFDState.UNKNOWN
+
+
+def test_read_parameters_still_raises_when_the_measurement_block_fails():
+    """The measurement block is mandatory: without it there is nothing to report."""
+    vfd, _ = _connected([ExceptionResponse(function_code=3)])
+    with pytest.raises(ModbusOperationError):
+        asyncio.run(vfd.read_parameters())
+
+
+def test_read_state_returns_unknown_when_the_status_register_is_refused():
+    """A refused status read is "unknown", not an exception."""
+    vfd, _ = _connected([ExceptionResponse(function_code=3)])
+    assert asyncio.run(vfd.read_state()) is VFDState.UNKNOWN
+
+
 # -- state and faults -------------------------------------------------------
 
 

@@ -160,6 +160,31 @@ class VesperE48400ModbusVFD(VFDProtocol):
             )
         return list(response.registers)
 
+    async def _read_optional_registers(self, address: int, count: int) -> list[int] | None:
+        """
+        Read holding registers, returning ``None`` instead of raising on failure.
+
+        Used for readings that refine a snapshot but must not fail it: a drive
+        that refuses one diagnostic register still reports its frequency,
+        current and state, and a poll loop that raised on every optional read
+        would never publish anything.
+
+        Args:
+            address: Starting register address.
+            count: Number of registers to read.
+
+        Returns:
+            list[int] | None: The register values, or ``None`` when the read
+                failed.
+        """
+        try:
+            return await self._read_registers(address, count)
+        except ModbusOperationError as exc:
+            self.logger.warning(
+                "%s: Optional register %s is unreadable (%s).", self.label, address, exc
+            )
+            return None
+
     async def _write_register(self, address: int, value: int) -> None:
         """
         Write a single holding register, raising on a Modbus exception response.
@@ -221,13 +246,19 @@ class VesperE48400ModbusVFD(VFDProtocol):
         temperature are read separately because the gaps between them would
         otherwise pull in reserved registers.
 
+        The three separate readings and the run state are optional: a drive that
+        refuses one of them still reports its frequency and current, so the
+        affected field stays ``None`` (or ``VFDState.UNKNOWN``) instead of
+        failing the whole snapshot.
+
         Returns:
             VFDParameters: The decoded parameters. ``heatsink_temperature_c`` is
                 populated from U1-46; ``motor_temperature_c`` stays ``None``
                 because the drive reports motor overheat only as a fault.
 
         Raises:
-            ModbusOperationError: If any read fails.
+            ModbusOperationError: If the measurement block or E1-04 cannot be
+                read.
         """
         await self._read_max_frequency()
         block = await self._read_registers(
@@ -235,16 +266,16 @@ class VesperE48400ModbusVFD(VFDProtocol):
         )
         offset = registers.PARAMETERS_BLOCK_ADDRESS
         frequency_hz = registers.output_frequency_hz(block[registers.REG_OUTPUT_FREQUENCY - offset])
-        voltage = await self._read_registers(registers.REG_OUTPUT_VOLTAGE, 1)
-        dc_bus = await self._read_registers(registers.REG_DC_BUS_VOLTAGE, 1)
-        temperature = await self._read_registers(registers.REG_HEATSINK_TEMPERATURE, 1)
+        voltage = await self._read_optional_registers(registers.REG_OUTPUT_VOLTAGE, 1)
+        dc_bus = await self._read_optional_registers(registers.REG_DC_BUS_VOLTAGE, 1)
+        temperature = await self._read_optional_registers(registers.REG_HEATSINK_TEMPERATURE, 1)
         parameters = VFDParameters(
             frequency_hz=frequency_hz,
             frequency_percent=self._percent(frequency_hz),
             output_current=registers.output_current_a(block[registers.REG_OUTPUT_CURRENT - offset]),
-            output_voltage=float(voltage[0]),
-            dc_bus_voltage=float(dc_bus[0]),
-            heatsink_temperature_c=float(temperature[0]),
+            output_voltage=float(voltage[0]) if voltage is not None else 0.0,
+            dc_bus_voltage=float(dc_bus[0]) if dc_bus is not None else None,
+            heatsink_temperature_c=float(temperature[0]) if temperature is not None else None,
             state=await self.read_state(),
         )
         self.logger.debug("%s: %s", self.label, parameters)
@@ -255,12 +286,12 @@ class VesperE48400ModbusVFD(VFDProtocol):
         Read the drive's run state.
 
         Returns:
-            VFDState: The decoded state.
-
-        Raises:
-            ModbusOperationError: If the status register cannot be read.
+            VFDState: The decoded state, or ``VFDState.UNKNOWN`` when the status
+                register is unreadable.
         """
-        raw = await self._read_registers(registers.REG_STATUS, 1)
+        raw = await self._read_optional_registers(registers.REG_STATUS, 1)
+        if raw is None:
+            return VFDState.UNKNOWN
         state = registers.status_to_state(raw[0])
         self.logger.debug("%s: Current state: %s", self.label, state)
         return state
