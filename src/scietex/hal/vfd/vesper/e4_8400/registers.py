@@ -109,6 +109,11 @@ REG_COUNTER = 0x004E  # U1-47, counter value
 REG_RUN_TIME_1 = 0x004F  # U1-48, run time 1
 REG_RUN_TIME_2 = 0x0050  # U1-49, run time 2
 
+# U1-48 and U1-49 are not read: the manual names them "run time 1" and "run time
+# 2" without stating a unit or which one is cumulative, and no drive was
+# available to measure them. `VFDParameters.total_run_hours` therefore stays
+# ``None`` for this model and the caller accumulates the hours itself.
+
 # Fault snapshot, read only. The values are captured when the last fault
 # occurred and are not updated while the drive runs.
 REG_FAULT_OUTPUT_FREQUENCY = 0x0083  # U2-04, output frequency at fault

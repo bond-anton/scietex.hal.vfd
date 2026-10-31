@@ -54,6 +54,16 @@ REG_AUX_FREQUENCY_Y = 0x1020  # Auxiliary frequency Y, raw
 PARAMETERS_BLOCK_ADDRESS = REG_OPERATING_FREQUENCY
 PARAMETERS_BLOCK_COUNT = 5
 
+# The two consecutive run-time counters, read as a second block because they sit
+# outside the measurement block. The manual calls them "raw" and states no unit;
+# the drive was measured incrementing 0x101A by one per minute, so both are
+# minutes. `0x1015` (remaining run time) is deliberately not read: it is the
+# countdown to a maintenance interval, not a total, and it reads 0 when no
+# interval is configured.
+RUN_TIME_BLOCK_ADDRESS = REG_TOTAL_POWER_ON_TIME
+RUN_TIME_BLOCK_COUNT = 2
+RUN_TIME_RESOLUTION = 60.0  # Counter units per hour
+
 # Control register, FC06 write only.
 REG_CONTROL = 0x2000
 CONTROL_FORWARD_RUN = 1
@@ -183,6 +193,23 @@ def raw_to_percent(raw: int) -> float:
         float: The percentage, 0..100 for an in-range register value.
     """
     return raw / ANALOG_OUTPUT_MAX_RAW * 100.0
+
+
+def run_time_to_hours(raw: int) -> float:
+    """
+    Convert a run-time counter register into hours.
+
+    The manual states no unit for `REG_TOTAL_POWER_ON_TIME` and
+    `REG_TOTAL_RUN_TIME`. The drive was measured incrementing the power-on
+    counter by exactly one over sixty seconds, so the counters are minutes.
+
+    Args:
+        raw: The register value.
+
+    Returns:
+        float: The counter as hours.
+    """
+    return raw / RUN_TIME_RESOLUTION
 
 
 def status_to_state(status: int) -> VFDState:

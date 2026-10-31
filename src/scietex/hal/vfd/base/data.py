@@ -62,6 +62,13 @@ class VFDParameters(msgspec.Struct, frozen=True):
         motor_temperature_c: Motor winding or PTC temperature in degrees
             Celsius, or ``None`` when the drive does not report it.
         state: Current VFD state.
+        total_run_hours: Cumulative motor run time in hours, or ``None`` when
+            the drive keeps no such counter. A drive that reports the counter
+            but refuses the read also yields ``None``: the caller cannot tell
+            "no counter" from "unreadable", and both mean the value must come
+            from somewhere else.
+        total_power_on_hours: Cumulative powered-on time in hours, or ``None``
+            when the drive keeps no such counter.
     """
 
     frequency_hz: float | None  # Current operating frequency in Hz
@@ -73,6 +80,8 @@ class VFDParameters(msgspec.Struct, frozen=True):
     heatsink_temperature_c: float | None = None  # Power-module temperature, deg C
     motor_temperature_c: float | None = None  # Motor temperature, deg C
     state: VFDState = VFDState.STOPPED  # Current VFD state
+    total_run_hours: float | None = None  # Cumulative run time, hours
+    total_power_on_hours: float | None = None  # Cumulative power-on time, hours
 
     def __str__(self) -> str:
         return (
@@ -84,7 +93,9 @@ class VFDParameters(msgspec.Struct, frozen=True):
             f"dc_bus={self.dc_bus_voltage} V, "
             f"heatsink={self.heatsink_temperature_c} C, "
             f"motor={self.motor_temperature_c} C, "
-            f"state={self.state})"
+            f"state={self.state}, "
+            f"run_hours={self.total_run_hours}, "
+            f"power_on_hours={self.total_power_on_hours})"
         )
 
 

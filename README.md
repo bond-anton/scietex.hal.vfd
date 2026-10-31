@@ -23,8 +23,9 @@ A driver reaches a drive over one of two transports:
   unsupported command before dispatching it.
 - `VFDParameters`, which reports frequency in both Hz and percent of the
   configured maximum, plus output current, voltage and power, and the optional
-  DC bus voltage and temperatures a drive exposes. An optional field is `None`
-  when the drive does not report it, which is distinct from a reported `0.0`.
+  DC bus voltage, temperatures and run-time counters a drive exposes. An
+  optional field is `None` when the drive does not report it, which is distinct
+  from a reported `0.0`.
 - Implemented drive models, each with both transports:
   - `Intek SPE-B` — direct RS485 (`SPEvB`) and gateway (`IntekSPEBModbusVFD`).
   - `Vesper E5-8200` — direct RS485 (`VesperE58200`) and gateway
@@ -46,9 +47,20 @@ A driver reaches a drive over one of two transports:
 | `dc_bus_voltage` | yes | yes | yes |
 | `heatsink_temperature_c` | no (`None`) | no (`None`) | yes |
 | `motor_temperature_c` | no (`None`) | no (`None`) | no (`None`) |
+| `total_run_hours` | yes | no (`None`) | no (`None`) |
+| `total_power_on_hours` | yes | no (`None`) | no (`None`) |
 
 Only the E4-8400 exposes a live temperature reading (`004Dh`, U1-46). The other
 two report overheat only as a fault code, and a fault is not a temperature.
+
+The SPE-B keeps two run-time counters (`0x101A` power-on, `0x101B` run). The
+manual states no unit; the drive was measured incrementing the power-on counter
+by exactly one over sixty seconds, so both are minutes and are reported as
+hours. The E4-8400 defines U1-48 and U1-49 as "run time 1" and "run time 2"
+without stating a unit or which is cumulative, and no drive was available to
+measure them, so both hours fields stay `None` for that model. The E5-8200 has
+no counter at all. A caller that needs hours for either drive accumulates them
+itself.
 
 ¹ The SPE-B reports the operating frequency only as a percentage of `P0.10`, so
 `frequency_hz` is `None` until `P0.10` has been read. A drive that refuses

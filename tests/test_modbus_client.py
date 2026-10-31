@@ -132,8 +132,8 @@ def test_read_before_connect_raises():
 
 
 def test_read_parameters_scales_percent_current_and_reads_state():
-    """One block read at 0x1001, then the status register."""
-    vfd, stub = _connected([_read([5000, 540, 380, 123, 45]), _read([1])])
+    """One block read at 0x1001, the run-time block, then the status register."""
+    vfd, stub = _connected([_read([5000, 540, 380, 123, 45]), _read([3231, 120]), _read([1])])
     parameters = asyncio.run(vfd.read_parameters())
 
     assert stub.calls == [
@@ -143,6 +143,7 @@ def test_read_parameters_scales_percent_current_and_reads_state():
             registers.PARAMETERS_BLOCK_COUNT,
             1,
         ),
+        ("read", registers.RUN_TIME_BLOCK_ADDRESS, registers.RUN_TIME_BLOCK_COUNT, 1),
         ("read", registers.REG_STATUS, 1, 1),
     ]
     assert parameters.frequency_percent == pytest.approx(50.0)
@@ -151,20 +152,34 @@ def test_read_parameters_scales_percent_current_and_reads_state():
     assert parameters.output_voltage == pytest.approx(380.0)
     assert parameters.output_power == pytest.approx(45.0)
     assert parameters.state is VFDState.RUNNING_FORWARD
+    assert parameters.total_power_on_hours == pytest.approx(53.85)
+    assert parameters.total_run_hours == pytest.approx(2.0)
 
 
 def test_read_parameters_uses_the_coarse_current_resolution():
     """Pd.06 = 1 means 0.1 A per count."""
-    vfd, _ = _connected([_read([0, 0, 0, 123, 0]), _read([3])], current_raw=1)
+    vfd, _ = _connected([_read([0, 0, 0, 123, 0]), _read([0, 0]), _read([3])], current_raw=1)
     assert asyncio.run(vfd.read_parameters()).output_current == pytest.approx(12.3)
 
 
 def test_read_parameters_reports_no_hz_when_p010_is_zero():
     """An unusable maximum frequency keeps the percentage but cannot scale it."""
-    vfd, _ = _connected([_read([5000, 0, 0, 0, 0]), _read([3])], max_frequency_raw=0)
+    vfd, _ = _connected([_read([5000, 0, 0, 0, 0]), _read([0, 0]), _read([3])], max_frequency_raw=0)
     parameters = asyncio.run(vfd.read_parameters())
     assert parameters.frequency_percent == pytest.approx(50.0)
     assert parameters.frequency_hz is None
+
+
+def test_read_parameters_survives_an_unreadable_run_time_block():
+    """A refused run-time block leaves the hours unknown, not the snapshot empty."""
+    vfd, _ = _connected(
+        [_read([5000, 540, 380, 123, 45]), ExceptionResponse(function_code=3), _read([1])]
+    )
+    parameters = asyncio.run(vfd.read_parameters())
+    assert parameters.frequency_hz == pytest.approx(25.0)
+    assert parameters.total_run_hours is None
+    assert parameters.total_power_on_hours is None
+    assert parameters.state is VFDState.RUNNING_FORWARD
 
 
 def test_connect_survives_a_refused_p010_and_still_reports_measurements():
@@ -181,6 +196,7 @@ def test_connect_survives_a_refused_p010_and_still_reports_measurements():
             ExceptionResponse(function_code=3),  # P0.10
             _read([1]),  # Pd.06 = coarse, 0.1 A
             _read([5000, 540, 380, 123, 45]),
+            _read([3231, 120]),  # run-time block
             _read([1]),  # status: running forward
         ]
     )
@@ -194,6 +210,7 @@ def test_connect_survives_a_refused_p010_and_still_reports_measurements():
     assert parameters.output_voltage == pytest.approx(380.0)
     assert parameters.dc_bus_voltage == pytest.approx(540.0)
     assert parameters.state is VFDState.RUNNING_FORWARD
+    assert parameters.total_run_hours == pytest.approx(2.0)
 
 
 def test_set_frequency_still_refuses_when_p010_is_unknown():
@@ -210,12 +227,19 @@ def test_read_parameters_survives_an_unreadable_status_register():
     would mean a drive that refuses one diagnostic register never reports its
     frequency, current or voltage at all.
     """
-    vfd, _ = _connected([_read([5000, 540, 380, 123, 45]), ExceptionResponse(function_code=3)])
+    vfd, _ = _connected(
+        [
+            _read([5000, 540, 380, 123, 45]),
+            _read([3231, 120]),
+            ExceptionResponse(function_code=3),
+        ]
+    )
     parameters = asyncio.run(vfd.read_parameters())
     assert parameters.frequency_hz == pytest.approx(25.0)
     assert parameters.output_current == pytest.approx(1.23)
     assert parameters.output_voltage == pytest.approx(380.0)
     assert parameters.state is VFDState.UNKNOWN
+    assert parameters.total_run_hours == pytest.approx(2.0)
 
 
 def test_read_parameters_still_raises_when_the_measurement_block_fails():
@@ -332,7 +356,7 @@ def test_write_raises_on_an_exception_response():
 
 def test_read_data_returns_the_parameter_fields():
     """`read_data` flattens `VFDParameters` into a plain mapping."""
-    vfd, _ = _connected([_read([5000, 0, 380, 100, 10]), _read([2])])
+    vfd, _ = _connected([_read([5000, 0, 380, 100, 10]), _read([3231, 120]), _read([2])])
     data = asyncio.run(vfd.read_data())
     assert data == {
         "frequency_hz": pytest.approx(25.0),
@@ -344,4 +368,6 @@ def test_read_data_returns_the_parameter_fields():
         "heatsink_temperature_c": None,
         "motor_temperature_c": None,
         "state": VFDState.RUNNING_BACKWARD,
+        "total_run_hours": pytest.approx(2.0),
+        "total_power_on_hours": pytest.approx(53.85),
     }

@@ -206,7 +206,9 @@ class VesperE48400(VFD):
         Returns:
             VFDParameters: The decoded parameters. ``heatsink_temperature_c`` is
                 populated from U1-46; ``motor_temperature_c`` stays ``None``
-                because the drive reports motor overheat only as a fault.
+                because the drive reports motor overheat only as a fault. Both
+                hours fields stay ``None``: U1-48 and U1-49 are undocumented as
+                to unit and meaning, so the caller accumulates the hours.
 
         Raises:
             ModbusOperationError: If the measurement block or E1-04 cannot be

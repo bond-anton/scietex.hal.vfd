@@ -39,6 +39,19 @@ def test_parameters_block_starts_at_the_operating_frequency():
     )
 
 
+def test_run_time_block_spans_the_two_counters():
+    """Power-on time is 0x101A and run time 0x101B, so one read covers both."""
+    assert registers.RUN_TIME_BLOCK_ADDRESS == 0x101A
+    assert registers.RUN_TIME_BLOCK_COUNT == 2
+    assert registers.RUN_TIME_BLOCK_ADDRESS + registers.RUN_TIME_BLOCK_COUNT - 1 == 0x101B
+
+
+@pytest.mark.parametrize("raw, expected_hours", [(0, 0.0), (60, 1.0), (3231, 53.85)])
+def test_run_time_to_hours(raw, expected_hours):
+    """The counters are minutes: the drive was measured incrementing by one per minute."""
+    assert registers.run_time_to_hours(raw) == pytest.approx(expected_hours)
+
+
 @pytest.mark.parametrize(
     "percent, expected_hz",
     [(100.0, 50.0), (50.0, 25.0), (0.0, 0.0), (-100.0, -50.0), (200.0, 100.0)],

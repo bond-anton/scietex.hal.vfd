@@ -69,6 +69,17 @@ so both `heatsink_temperature_c` and `motor_temperature_c` stay `None`. A drive
 that signals overheat only through a fault is not reporting a temperature, and
 reporting `0.0` would look like a cold drive.
 
+### 2.2 Run-time counters
+
+`0x101A` (total power-on time) and `0x101B` (total run time) are contiguous, so
+the driver reads them as one 2-word block. The manual states no unit for either.
+The drive was measured incrementing `0x101A` by exactly one over sixty seconds,
+so both counters are minutes; the driver divides by 60 and reports hours.
+
+`0x1015` (remaining run time) is deliberately not read: it is the countdown to a
+maintenance interval, not a total, and it reads `0` when no interval is
+configured — which is indistinguishable from "no time remaining".
+
 ## 3. Control register (FC06, write only)
 
 Address `0x2000`:
@@ -269,10 +280,12 @@ stays off unless the installation wants the drive to stop when polling ceases.
 | `connect()` | Opens the TCP connection, then reads `P0.10` and `Pd.06` |
 | `P0.10` unreadable | Warning, connection kept, `frequency_hz` reported as `None`: the percentage, current, voltage and power are still readable, and raising here would blank the whole snapshot |
 | `Pd.06` unreadable | Warning, connection kept, `0.01 A` assumed: stop and fault reset must stay available |
-| `read_parameters()` | One 5-word block read at `0x1001`, then the status register |
+| `read_parameters()` | One 5-word block read at `0x1001`, one 2-word block at `0x101A`, then the status register |
 | Status register unreadable | Warning, `state` reported as `VFDState.UNKNOWN`: the measurements are still published |
+| Run-time block unreadable | Warning, both hours fields reported as `None`: the measurements are still published |
 | `read_error_code()` | Raises on a failed read; a transport failure is never reported as "no fault" |
 | `clear_error()` | Writes `7` to `0x2000`, then reads the requested fault table back |
 | `start()` / `stop()` | Single FC06 write to `0x2000` |
 | `set_frequency()` | Writes `0x1000` as hundredths of a percent of `P0.10`; raises `ValueError` when `P0.10` is unknown or the request exceeds the maximum |
 | `heatsink_temperature_c` / `motor_temperature_c` | Always `None`: the drive reports overheat only as a fault code (§2.1) |
+| `total_run_hours` / `total_power_on_hours` | From `0x101B` / `0x101A`, divided by 60: the counters are minutes (§2.2) |

@@ -270,6 +270,10 @@ class IntekSPEBModbusVFD(VFDProtocol):
         the status register still reports its measurements, so the state falls
         back to ``VFDState.UNKNOWN`` instead of failing the whole snapshot.
 
+        The two run-time counters are read as a second block and are optional
+        for the same reason: a drive that refuses them still reports its
+        measurements, and the hours fields stay ``None``.
+
         Returns:
             VFDParameters: The decoded parameters. Both temperature fields are
                 ``None``: SPE-B reports overheat as a fault code, not a reading.
@@ -287,6 +291,9 @@ class IntekSPEBModbusVFD(VFDProtocol):
             block[registers.REG_OUTPUT_CURRENT - registers.PARAMETERS_BLOCK_ADDRESS]
             * self._current_resolution
         )
+        run_time = await self._read_optional_registers(
+            registers.RUN_TIME_BLOCK_ADDRESS, registers.RUN_TIME_BLOCK_COUNT
+        )
         parameters = VFDParameters(
             frequency_hz=self._percent_to_hz(percent),
             frequency_percent=percent,
@@ -301,6 +308,12 @@ class IntekSPEBModbusVFD(VFDProtocol):
                 block[registers.REG_DC_BUS_VOLTAGE - registers.PARAMETERS_BLOCK_ADDRESS]
             ),
             state=await self.read_state(),
+            total_power_on_hours=(
+                registers.run_time_to_hours(run_time[0]) if run_time is not None else None
+            ),
+            total_run_hours=(
+                registers.run_time_to_hours(run_time[1]) if run_time is not None else None
+            ),
         )
         self.logger.debug("%s: %s", self.label, parameters)
         return parameters

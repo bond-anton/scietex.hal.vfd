@@ -138,7 +138,9 @@ class VesperE58200(VFD):
         back to ``VFDState.UNKNOWN`` instead of failing the whole snapshot.
 
         Returns:
-            VFDParameters: The decoded parameters.
+            VFDParameters: The decoded parameters. Both hours fields stay
+                ``None``: the drive exposes no run-time counter, so the caller
+                accumulates the hours.
 
         Raises:
             ModbusOperationError: If the measurement block cannot be read.

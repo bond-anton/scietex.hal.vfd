@@ -127,6 +127,12 @@ class SPEvB(VFD):
             else None
         )
         state = await self.read_state()
+        run_time = await self.read_registers(
+            registers.RUN_TIME_BLOCK_ADDRESS,
+            registers.RUN_TIME_BLOCK_COUNT,
+            holding=True,
+            raise_on_error=False,
+        )
         return VFDParameters(
             frequency_hz=frequency_hz,
             frequency_percent=percent,
@@ -141,6 +147,12 @@ class SPEvB(VFD):
                 block[registers.REG_DC_BUS_VOLTAGE - registers.PARAMETERS_BLOCK_ADDRESS]
             ),
             state=state,
+            total_power_on_hours=(
+                registers.run_time_to_hours(run_time[0]) if run_time is not None else None
+            ),
+            total_run_hours=(
+                registers.run_time_to_hours(run_time[1]) if run_time is not None else None
+            ),
         )
 
     async def read_state(self) -> VFDState:
