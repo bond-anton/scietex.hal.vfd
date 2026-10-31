@@ -53,12 +53,22 @@ class SPEvB(VFD):
         self._current_resolution = registers.CURRENT_RESOLUTION_FINE
 
     async def _read_scale_factors(self) -> None:
-        """Read P0.10 and Pd.06 from the drive once and cache them."""
-        raw = await self.read_register(registers.PARAM_MAX_FREQUENCY_EEPROM, holding=True)
+        """
+        Read P0.10 and Pd.06 from the drive once and cache them.
+
+        P0.10 is optional: a drive that refuses it still reports its operating
+        percentage, current, voltage and power, so only ``frequency_hz``
+        degrades to ``None``. Raising here would fail the whole snapshot.
+        """
+        raw = await self.read_register(
+            registers.PARAM_MAX_FREQUENCY_EEPROM,
+            holding=True,
+            raise_on_error=False,
+        )
         self._max_frequency_hz = (raw or 0) / registers.PARAMETER_FREQUENCY_RESOLUTION
         if self._max_frequency_hz <= 0:
             self.logger.warning(
-                "%s: P0.10 reads %s, frequency is reported as 0 Hz.", self.label, raw
+                "%s: P0.10 reads %s, frequency is reported as None.", self.label, raw
             )
         # Pd.06 only refines the current reading, so a drive that refuses the
         # read keeps working with the factory resolution.
@@ -114,7 +124,7 @@ class SPEvB(VFD):
         frequency_hz = (
             registers.percent_to_hz(percent, self._max_frequency_hz)
             if self._max_frequency_hz
-            else 0.0
+            else None
         )
         state = await self.read_state()
         return VFDParameters(

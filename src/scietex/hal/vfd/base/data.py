@@ -44,7 +44,10 @@ class VFDParameters(msgspec.Struct, frozen=True):
     """Model for VFD operational parameters.
 
     Attributes:
-        frequency_hz: Output frequency in Hz.
+        frequency_hz: Output frequency in Hz, or ``None`` when the drive
+            reports the frequency only as a percentage and the maximum it is a
+            percentage of is unknown. ``None`` rather than 0.0 because the drive
+            has not reported a frequency of zero — it has reported nothing.
         frequency_percent: Output frequency as a percentage of the configured
             maximum, 0-100.
         output_current: Output current in Amps.
@@ -61,7 +64,7 @@ class VFDParameters(msgspec.Struct, frozen=True):
         state: Current VFD state.
     """
 
-    frequency_hz: float  # Current operating frequency in Hz
+    frequency_hz: float | None  # Current operating frequency in Hz
     frequency_percent: float  # Frequency as a percentage of max (0-100%)
     output_current: float = 0.0  # Output current in Amps
     output_voltage: float = 0.0  # Output voltage in Volts

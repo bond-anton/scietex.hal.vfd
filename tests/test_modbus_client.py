@@ -159,12 +159,48 @@ def test_read_parameters_uses_the_coarse_current_resolution():
     assert asyncio.run(vfd.read_parameters()).output_current == pytest.approx(12.3)
 
 
-def test_read_parameters_reports_zero_hz_when_p010_is_zero():
-    """An unreadable maximum frequency keeps the percentage but cannot scale it."""
+def test_read_parameters_reports_no_hz_when_p010_is_zero():
+    """An unusable maximum frequency keeps the percentage but cannot scale it."""
     vfd, _ = _connected([_read([5000, 0, 0, 0, 0]), _read([3])], max_frequency_raw=0)
     parameters = asyncio.run(vfd.read_parameters())
     assert parameters.frequency_percent == pytest.approx(50.0)
-    assert parameters.frequency_hz == pytest.approx(0.0)
+    assert parameters.frequency_hz is None
+
+
+def test_connect_survives_a_refused_p010_and_still_reports_measurements():
+    """A drive that refuses P0.10 must not blank the whole snapshot.
+
+    An SPE-B that has not been configured for Modbus (Pd.01/Pd.05) answers the
+    gateway with exception 11 for every register. Raising from `connect()` made
+    the poll loop log a connect failure every cycle and publish nothing; the
+    percentage, current, voltage and power are still readable, so only
+    `frequency_hz` degrades to None.
+    """
+    stub = _StubClient(
+        [
+            ExceptionResponse(function_code=3),  # P0.10
+            _read([1]),  # Pd.06 = coarse, 0.1 A
+            _read([5000, 540, 380, 123, 45]),
+            _read([1]),  # status: running forward
+        ]
+    )
+    vfd = IntekSPEBModbusVFD("127.0.0.1")
+    vfd._client = stub
+    asyncio.run(vfd.connect())
+    parameters = asyncio.run(vfd.read_parameters())
+    assert parameters.frequency_percent == pytest.approx(50.0)
+    assert parameters.frequency_hz is None
+    assert parameters.output_current == pytest.approx(12.3)
+    assert parameters.output_voltage == pytest.approx(380.0)
+    assert parameters.dc_bus_voltage == pytest.approx(540.0)
+    assert parameters.state is VFDState.RUNNING_FORWARD
+
+
+def test_set_frequency_still_refuses_when_p010_is_unknown():
+    """Without P0.10 no percentage can be computed, so the write is rejected."""
+    vfd, _ = _connected([], max_frequency_raw=0)
+    with pytest.raises(ValueError, match="P0.10"):
+        asyncio.run(vfd.set_frequency(25.0))
 
 
 def test_read_parameters_survives_an_unreadable_status_register():

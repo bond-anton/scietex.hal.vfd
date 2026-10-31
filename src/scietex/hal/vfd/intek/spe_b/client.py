@@ -103,11 +103,13 @@ class IntekSPEBModbusVFD(VFDProtocol):
         Open the TCP connection to the gateway and read the drive's scale factors.
 
         Raises:
-            ModbusOperationError: If the gateway is unreachable, or if P0.10
-                cannot be read. pymodbus reports a failed connect by returning
-                ``False`` rather than raising, so the result is checked here;
-                otherwise an unreachable drive would look connected and only
-                fail on the first read.
+            ModbusOperationError: If the gateway is unreachable. pymodbus
+                reports a failed connect by returning ``False`` rather than
+                raising, so the result is checked here; otherwise an
+                unreachable drive would look connected and only fail on the
+                first read. An unreadable P0.10 is not an error: the drive
+                still reports its measurements, only ``frequency_hz`` degrades
+                to ``None``.
         """
         if self._client is None:
             self._client = AsyncModbusTcpClient(self._host, port=self._port, timeout=self._timeout)
@@ -205,16 +207,25 @@ class IntekSPEBModbusVFD(VFDProtocol):
         """
         Read and cache the P0.10 maximum frequency and the Pd.06 resolution.
 
-        Raises:
-            ModbusOperationError: If P0.10 cannot be read, because every
-                frequency this client reports would then be a guess.
+        P0.10 is optional: a drive that refuses it still reports its operating
+        percentage, current, voltage and power, so the connection stays usable
+        and only ``frequency_hz`` degrades to ``None``. Raising here would make
+        the poll loop log a connect failure every cycle and publish nothing at
+        all, which is what an SPE-B that has not been configured for Modbus
+        (Pd.01/Pd.05) does — it answers the gateway with exception 11.
         """
-        raw = await self._read_registers(registers.PARAM_MAX_FREQUENCY_EEPROM, 1)
-        self._max_frequency_hz = raw[0] / registers.PARAMETER_FREQUENCY_RESOLUTION
-        if self._max_frequency_hz <= 0:
+        try:
+            raw = await self._read_registers(registers.PARAM_MAX_FREQUENCY_EEPROM, 1)
+        except ModbusOperationError as exc:
             self.logger.warning(
-                "%s: P0.10 reads %d, frequency is reported as 0 Hz.", self.label, raw[0]
+                "%s: P0.10 is unreadable (%s), frequency is reported as None.", self.label, exc
             )
+        else:
+            self._max_frequency_hz = raw[0] / registers.PARAMETER_FREQUENCY_RESOLUTION
+            if self._max_frequency_hz <= 0:
+                self.logger.warning(
+                    "%s: P0.10 reads %d, frequency is reported as None.", self.label, raw[0]
+                )
         # Pd.06 only refines the current reading, so a drive that refuses the
         # read keeps working with the factory resolution instead of failing
         # the connection: stop and fault reset must stay available.
@@ -229,7 +240,7 @@ class IntekSPEBModbusVFD(VFDProtocol):
             else registers.CURRENT_RESOLUTION_FINE
         )
 
-    def _percent_to_hz(self, percent: float) -> float:
+    def _percent_to_hz(self, percent: float) -> float | None:
         """
         Convert an operating frequency percentage into Hz.
 
@@ -237,10 +248,13 @@ class IntekSPEBModbusVFD(VFDProtocol):
             percent: Frequency as reported by the drive.
 
         Returns:
-            float: The frequency in Hz, or 0.0 while P0.10 is unknown.
+            float | None: The frequency in Hz, or ``None`` while P0.10 is
+                unknown. ``None`` rather than 0.0 because a drive that refuses
+                P0.10 has not reported a frequency of zero — it has reported
+                nothing, and a caller must be able to tell the two apart.
         """
         if self._max_frequency_hz <= 0:
-            return 0.0
+            return None
         return registers.percent_to_hz(percent, self._max_frequency_hz)
 
     async def read_parameters(self) -> VFDParameters:

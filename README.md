@@ -38,7 +38,7 @@ A driver reaches a drive over one of two transports:
 
 | Field | Intek SPE-B | Vesper E5-8200 | Vesper E4-8400 |
 | --- | --- | --- | --- |
-| `frequency_hz` | yes | yes | yes |
+| `frequency_hz` | yes¹ | yes | yes |
 | `frequency_percent` | yes | yes | yes |
 | `output_current` | yes | yes | yes |
 | `output_voltage` | yes | yes | yes |
@@ -49,6 +49,12 @@ A driver reaches a drive over one of two transports:
 
 Only the E4-8400 exposes a live temperature reading (`004Dh`, U1-46). The other
 two report overheat only as a fault code, and a fault is not a temperature.
+
+¹ The SPE-B reports the operating frequency only as a percentage of `P0.10`, so
+`frequency_hz` is `None` until `P0.10` has been read. A drive that refuses
+`P0.10` still reports `frequency_percent`, current, voltage and power; the
+connection stays usable and only the Hz field degrades. `set_frequency` is
+refused in that state, because no percentage can be computed.
 
 ## Installation
 

@@ -225,7 +225,9 @@ returns whole percents, every frequency this driver reports is 100 times too
 low; the value in Hz is derived as `percent / 100 * P0.10`.
 
 `P0.10` itself is stored in `0.01 Hz` units: range `50.00..500.0 Hz`, default
-`50.00 Hz`, resolution `0.01 Hz`.
+`50.00 Hz`, resolution `0.01 Hz`. It is read once at `connect()` and cached; a
+drive that refuses the read reports `frequency_hz` as `None` while
+`frequency_percent` stays valid.
 
 ## 10. Deployment prerequisites
 
@@ -265,9 +267,10 @@ stays off unless the installation wants the drive to stop when polling ceases.
 | Concern | Behaviour |
 | --- | --- |
 | `connect()` | Opens the TCP connection, then reads `P0.10` and `Pd.06` |
-| `P0.10` unreadable | `connect()` raises: without it no frequency is meaningful |
+| `P0.10` unreadable | Warning, connection kept, `frequency_hz` reported as `None`: the percentage, current, voltage and power are still readable, and raising here would blank the whole snapshot |
 | `Pd.06` unreadable | Warning, connection kept, `0.01 A` assumed: stop and fault reset must stay available |
 | `read_parameters()` | One 5-word block read at `0x1001`, then the status register |
+| Status register unreadable | Warning, `state` reported as `VFDState.UNKNOWN`: the measurements are still published |
 | `read_error_code()` | Raises on a failed read; a transport failure is never reported as "no fault" |
 | `clear_error()` | Writes `7` to `0x2000`, then reads the requested fault table back |
 | `start()` / `stop()` | Single FC06 write to `0x2000` |
