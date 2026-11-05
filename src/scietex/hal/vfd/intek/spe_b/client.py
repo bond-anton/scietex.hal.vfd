@@ -8,7 +8,7 @@ the drive by its Modbus unit id. It never touches the RS485 framing.
 Two scale factors are read from the drive once, in :meth:`connect`, and cached
 for the lifetime of the connection:
 
-    P0.10 (EEPROM 0xF00A)  maximum output frequency, 0.01 Hz units
+    P0.10 (EEPROM 0xF00A)  maximum output frequency, 0.1 Hz units
     Pd.06 (EEPROM 0x7006)  output-current resolution, 0.01 A or 0.1 A
 
 The drive reports operating frequency as a percentage of P0.10 and output

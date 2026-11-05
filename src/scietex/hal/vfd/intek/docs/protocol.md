@@ -235,9 +235,16 @@ setpoint, so `5000` reads as `50.00%`. This is unverified. If the drive instead
 returns whole percents, every frequency this driver reports is 100 times too
 low; the value in Hz is derived as `percent / 100 * P0.10`.
 
-`P0.10` itself is stored in `0.01 Hz` units: range `50.00..500.0 Hz`, default
-`50.00 Hz`, resolution `0.01 Hz`. It is read once at `connect()` and cached; a
-drive that refuses the read reports `frequency_hz` as `None` while
+The setpoint register `0x1000` was probed on a drive with no motor attached: a
+write of `1000` is echoed by `0x101D`, and a write of `10001` reads back as
+`10000`. That clamp is consistent with a hundredths ceiling but does not prove
+it — a motorless drive may clamp a setpoint it cannot act on. Settling the scale
+needs a run with a motor attached, comparing `0x1001` against the keypad.
+
+`P0.10` itself is stored in `0.1 Hz` units: a drive set to `500 Hz` reads `5000`.
+The manual's stated range is `50.00..500.0 Hz` with a `50.00 Hz` factory default,
+which is raw `500..5000` on this scale. It is read once at `connect()` and
+cached; a drive that refuses the read reports `frequency_hz` as `None` while
 `frequency_percent` stays valid.
 
 ## 10. Deployment prerequisites

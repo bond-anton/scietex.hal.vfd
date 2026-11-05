@@ -21,7 +21,7 @@ from scietex.hal.vfd.base.data import VFDState
 from scietex.hal.vfd.intek.spe_b import registers
 from scietex.hal.vfd.intek.spe_b.client import IntekSPEBModbusVFD
 
-DEFAULT_MAX_FREQUENCY_RAW = 5000  # P0.10 = 50.00 Hz
+DEFAULT_MAX_FREQUENCY_RAW = 5000  # P0.10 = 500.0 Hz (0.1 Hz units)
 
 
 class _StubClient:
@@ -88,7 +88,7 @@ def test_connect_reads_scale_factors_from_the_drive():
         ("read", registers.PARAM_MAX_FREQUENCY_EEPROM, 1, 1),
         ("read", registers.PARAM_CURRENT_RESOLUTION_EEPROM, 1, 1),
     ]
-    assert vfd._max_frequency_hz == pytest.approx(60.0)
+    assert vfd._max_frequency_hz == pytest.approx(600.0)
     assert vfd._current_resolution == pytest.approx(0.1)
 
 
@@ -147,7 +147,7 @@ def test_read_parameters_scales_percent_current_and_reads_state():
         ("read", registers.REG_STATUS, 1, 1),
     ]
     assert parameters.frequency_percent == pytest.approx(50.0)
-    assert parameters.frequency_hz == pytest.approx(25.0)
+    assert parameters.frequency_hz == pytest.approx(250.0)
     assert parameters.output_current == pytest.approx(1.23)
     assert parameters.output_voltage == pytest.approx(380.0)
     assert parameters.output_power == pytest.approx(45.0)
@@ -176,7 +176,7 @@ def test_read_parameters_survives_an_unreadable_run_time_block():
         [_read([5000, 540, 380, 123, 45]), ExceptionResponse(function_code=3), _read([1])]
     )
     parameters = asyncio.run(vfd.read_parameters())
-    assert parameters.frequency_hz == pytest.approx(25.0)
+    assert parameters.frequency_hz == pytest.approx(250.0)
     assert parameters.total_run_hours is None
     assert parameters.total_power_on_hours is None
     assert parameters.state is VFDState.RUNNING_FORWARD
@@ -235,7 +235,7 @@ def test_read_parameters_survives_an_unreadable_status_register():
         ]
     )
     parameters = asyncio.run(vfd.read_parameters())
-    assert parameters.frequency_hz == pytest.approx(25.0)
+    assert parameters.frequency_hz == pytest.approx(250.0)
     assert parameters.output_current == pytest.approx(1.23)
     assert parameters.output_voltage == pytest.approx(380.0)
     assert parameters.state is VFDState.UNKNOWN
@@ -359,7 +359,7 @@ def test_read_data_returns_the_parameter_fields():
     vfd, _ = _connected([_read([5000, 0, 380, 100, 10]), _read([3231, 120]), _read([2])])
     data = asyncio.run(vfd.read_data())
     assert data == {
-        "frequency_hz": pytest.approx(25.0),
+        "frequency_hz": pytest.approx(250.0),
         "frequency_percent": pytest.approx(50.0),
         "output_current": pytest.approx(1.0),
         "output_voltage": pytest.approx(380.0),

@@ -103,9 +103,10 @@ PARAM_MAX_FREQUENCY_EEPROM = 0xF00A  # P0.10, max output frequency
 PARAM_MAX_FREQUENCY_RAM = 0x000A  # P0.10 RAM mirror
 PARAM_CURRENT_RESOLUTION_EEPROM = 0x7006  # Pd.06, current display resolution
 
-# P0.10 and the frequency parameters are stored in 0.01 Hz units; the value
-# range is 50.00..500.0 Hz with a 50.00 Hz factory default.
-PARAMETER_FREQUENCY_RESOLUTION = 100.0
+# P0.10 is stored in 0.1 Hz units: a drive set to 500 Hz reads 5000. The
+# manual's stated range is 50.00..500.0 Hz with a 50.00 Hz factory default,
+# which is raw 500..5000 on this scale.
+PARAMETER_FREQUENCY_RESOLUTION = 10.0
 
 # Pd.06 selects the output-current resolution: 0 = 0.01 A, 1 = 0.1 A.
 CURRENT_RESOLUTION_FINE = 0.01
