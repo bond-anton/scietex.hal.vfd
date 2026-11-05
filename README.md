@@ -32,8 +32,10 @@ A driver reaches a drive over one of two transports:
     (`VesperE58200ModbusVFD`).
   - `Vesper E4-8400` / `E4-P8402` — direct RS485 (`VesperE48400`) and gateway
     (`VesperE48400ModbusVFD`).
-- Driver descriptors for the gateway (`scietex.modbus.drivers` entry-point
-  group) and driver classes for a service (`scietex.hal.vfd.drivers` group).
+- Driver classes for a service (`scietex.hal.vfd.drivers` entry-point group).
+  The gateway descriptors for these drives are built into `scietex.hal.serial`
+  (`scietex.modbus.drivers` group): all three speak standard Modbus RTU, so the
+  gateway needs no code from this package to route them.
 
 ### What each drive reports
 

@@ -277,8 +277,8 @@ Two operational parameters decide whether the command registers act:
 installation wants the drive to stop when polling ceases.
 
 Once the drive answers on the bus, add it to the gateway with the
-`vesper_e4_8400` driver descriptor (`scietex.modbus_drivers`), which selects the
-built-in RTU framer and no translator.
+`vesper_e4_8400` driver descriptor (`scietex.modbus.drivers`, built into
+`scietex.hal.serial`), which selects the built-in RTU framer and no translator.
 
 ## 6. Driver behaviour
 

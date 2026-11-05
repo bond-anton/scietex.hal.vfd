@@ -258,8 +258,8 @@ Because the drive is unreachable until `Pd.01` and `Pd.05` are fixed, these
 changes are made from the drive's keypad (or over a direct serial link
 configured for the drive's current framing), not through the gateway. Once the
 drive answers on the bus, add it to the gateway with the `intek_spe_b` driver
-descriptor (`scietex.modbus_drivers`), which selects the built-in RTU framer
-and no translator.
+descriptor (`scietex.modbus.drivers`, built into `scietex.hal.serial`), which
+selects the built-in RTU framer and no translator.
 
 Two operational parameters decide whether the control registers act:
 

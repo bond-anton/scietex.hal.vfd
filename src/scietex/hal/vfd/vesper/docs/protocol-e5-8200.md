@@ -197,8 +197,8 @@ installation wants the drive to stop when polling ceases. With `09-07` set to
 the link returns; a new run command is required.
 
 Once the drive answers on the bus, add it to the gateway with the
-`vesper_e5_8200` driver descriptor (`scietex.modbus_drivers`), which selects the
-built-in RTU framer and no translator.
+`vesper_e5_8200` driver descriptor (`scietex.modbus.drivers`, built into
+`scietex.hal.serial`), which selects the built-in RTU framer and no translator.
 
 ## 6. Driver behaviour
 

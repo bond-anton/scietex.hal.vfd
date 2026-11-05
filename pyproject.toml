@@ -28,11 +28,6 @@ intek_spe_b_modbus = "scietex.hal.vfd.intek.spe_b:IntekSPEBModbusVFD"
 vesper_e5_8200_modbus = "scietex.hal.vfd.vesper.e5_8200:VesperE58200ModbusVFD"
 vesper_e4_8400_modbus = "scietex.hal.vfd.vesper.e4_8400:VesperE48400ModbusVFD"
 
-[project.entry-points."scietex.modbus.drivers"]
-intek_spe_b = "scietex.hal.vfd.modbus_drivers:intek_spe_b"
-vesper_e5_8200 = "scietex.hal.vfd.modbus_drivers:vesper_e5_8200"
-vesper_e4_8400 = "scietex.hal.vfd.modbus_drivers:vesper_e4_8400"
-
 [project.urls]
 "Homepage" = "https://github.com/bond-anton/scietex.hal.vfd"
 "Bug Tracker" = "https://github.com/bond-anton/scietex.hal.vfd/issues"
