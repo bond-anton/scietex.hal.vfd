@@ -19,7 +19,7 @@ classifiers = [
 requires-python = ">=3.10"
 dependencies = [
     "msgspec[yaml] ~= 0.20.0",
-    "scietex.hal.serial >= 2.4.0, < 3.0.0",
+    "scietex.hal.serial >= 2.5.0, < 3.0.0",
     "pymodbus ~= 3.15",
 ]
 
