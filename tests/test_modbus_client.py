@@ -280,10 +280,15 @@ def test_read_state_maps_the_status_register(status, expected):
     [(False, registers.REG_DRIVE_FAULT), (True, registers.REG_COMM_FAULT)],
 )
 def test_read_error_code_reads_the_selected_table(comm, address):
-    """The two fault tables live at consecutive registers."""
+    """The drive-fault table is read; the communication table is refused."""
     vfd, stub = _connected([_read([11])])
-    assert asyncio.run(vfd.read_error_code(comm=comm)) == 11
-    assert stub.calls == [("read", address, 1, 1)]
+    if comm:
+        with pytest.raises(ModbusOperationError):
+            asyncio.run(vfd.read_error_code(comm=comm))
+        assert stub.calls == []
+    else:
+        assert asyncio.run(vfd.read_error_code(comm=comm)) == 11
+        assert stub.calls == [("read", address, 1, 1)]
 
 
 def test_read_error_code_raises_instead_of_reporting_zero():
@@ -303,11 +308,12 @@ def test_clear_error_writes_the_reset_and_reads_the_code_back():
     ]
 
 
-def test_clear_error_reads_the_communication_table_when_asked():
-    """`comm=True` only changes which table is read back."""
+def test_clear_error_refuses_the_communication_table():
+    """`comm=True` is rejected before the reset write, so the drive is untouched."""
     vfd, stub = _connected([_write(registers.REG_CONTROL), _read([3])])
-    assert asyncio.run(vfd.clear_error(comm=True)) == 3
-    assert stub.calls[1] == ("read", registers.REG_COMM_FAULT, 1, 1)
+    with pytest.raises(ModbusOperationError):
+        asyncio.run(vfd.clear_error(comm=True))
+    assert stub.calls == []
 
 
 @pytest.mark.parametrize(

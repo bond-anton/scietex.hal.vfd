@@ -340,21 +340,24 @@ class IntekSPEBModbusVFD(VFDProtocol):
 
         Args:
             comm: Read the communication-protocol fault code instead of the
-                drive fault code.
+                drive fault code. Unsupported: the SPE-B answers `0x8001` with
+                a malformed frame, so this raises instead of tripping the
+                gateway's circuit breaker for the whole device.
 
         Returns:
             int: The fault code; 0 means no fault.
 
         Raises:
-            ModbusOperationError: If the register cannot be read. A failed read
-                is never reported as fault code 0.
+            ModbusOperationError: If the register cannot be read, or if ``comm``
+                is set. A failed read is never reported as fault code 0.
         """
-        address = registers.REG_COMM_FAULT if comm else registers.REG_DRIVE_FAULT
-        raw = await self._read_registers(address, 1)
         if comm:
-            self.logger.debug("%s: Communication error code %d.", self.label, raw[0])
-        else:
-            self.logger.debug("%s: Error code %d.", self.label, raw[0])
+            raise ModbusOperationError(
+                "The SPE-B does not serve the communication-fault register 0x8001: "
+                "it answers with a malformed frame. Read the drive-fault register instead."
+            )
+        raw = await self._read_registers(registers.REG_DRIVE_FAULT, 1)
+        self.logger.debug("%s: Error code %d.", self.label, raw[0])
         return raw[0]
 
     def parse_error_code(self, code: int, comm: bool = False) -> VFDError:
@@ -384,7 +387,17 @@ class IntekSPEBModbusVFD(VFDProtocol):
 
         Returns:
             int: The fault code read after the reset; 0 means the fault is gone.
+
+        Raises:
+            ModbusOperationError: If ``comm`` is set. The read-back would fail
+                after the reset had already been written, so the request is
+                refused before the drive is touched.
         """
+        if comm:
+            raise ModbusOperationError(
+                "The SPE-B does not serve the communication-fault register 0x8001: "
+                "it answers with a malformed frame. Read the drive-fault register instead."
+            )
         await self._write_register(registers.REG_CONTROL, registers.CONTROL_FAULT_RESET)
         return await self.read_error_code(comm)
 

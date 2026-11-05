@@ -176,6 +176,27 @@ keypad-set lock. The driver does not write it.
 Both tables are transcribed verbatim into `intek/spe_b/errors.py`. A code
 missing from a table is reported as an unknown error, never as "no fault".
 
+**`0x8001` is unreadable on the tested firmware.** The drive answers the read
+with a malformed frame: it puts the register address where the byte count
+belongs. A read of one register at `0x8001` returns
+
+```
+01 03 80 01 00 05 fd c9
+```
+
+where a well-formed FC03 response would be `01 03 02 00 05 78 47` — byte count
+`02`, then the value. The CRC `fd c9` is valid for the malformed frame, so the
+drive emits it deliberately rather than corrupting a good response. `0x8000`
+returns a correct frame (`01 03 02 00 00 b8 44`), so the defect is specific to
+`0x8001`.
+
+The gateway rejects the frame, retries three times, and then opens its circuit
+breaker for the device, which makes every other register fail for the cooldown
+period. `read_error_code(comm=True)` and `clear_error(comm=True)` therefore
+cannot work against this firmware: they raise, and the VFD service reports
+`VFD_COMMAND_FAILED` with `retryable=True`, so a caller retries forever. The
+drive-fault path (`0x8000`) is unaffected and is the one to use.
+
 ## 7. Parameter addressing
 
 Parameter numbers map onto register addresses. The high byte selects the group

@@ -83,19 +83,41 @@ class SPEvB(VFD):
 
     # Errors processing methods
     async def read_error_code(self, comm: bool = False) -> int:
-        """Read the latched fault code from the VFD"""
-        register = registers.REG_COMM_FAULT if comm else registers.REG_DRIVE_FAULT
-        code = await self.read_register(register, holding=True)
-        if code is None:
-            raise ModbusOperationError(f"Read of error code register {register} failed")
+        """
+        Read the latched fault code from the VFD.
+
+        The communication-fault register `0x8001` is not readable on this
+        firmware: the drive answers with a malformed frame that puts the
+        register address where the byte count belongs, so the gateway rejects
+        it and opens its circuit breaker for the whole device. Refusing here
+        keeps that failure local instead of taking every other register down
+        for the cooldown period. See ``intek/docs/protocol.md`` section 6.2.
+        """
         if comm:
-            self.logger.debug("%s: Communication error code %d.", self.label, code)
-        else:
-            self.logger.debug("%s: Error code %d.", self.label, code)
+            raise ModbusOperationError(
+                "The SPE-B does not serve the communication-fault register 0x8001: "
+                "it answers with a malformed frame. Read the drive-fault register instead."
+            )
+        code = await self.read_register(registers.REG_DRIVE_FAULT, holding=True)
+        if code is None:
+            raise ModbusOperationError(
+                f"Read of error code register {registers.REG_DRIVE_FAULT} failed"
+            )
+        self.logger.debug("%s: Error code %d.", self.label, code)
         return code
 
     async def clear_error(self, comm: bool = False) -> int:
-        """Reset the latched fault and read the code back"""
+        """
+        Reset the latched fault and read the code back.
+
+        ``comm=True`` is refused before the reset is written: the read-back
+        would fail after the drive had already been touched.
+        """
+        if comm:
+            raise ModbusOperationError(
+                "The SPE-B does not serve the communication-fault register 0x8001: "
+                "it answers with a malformed frame. Read the drive-fault register instead."
+            )
         self.logger.debug("%s: Clear error.", self.label)
         await self.write_register(registers.REG_CONTROL, registers.CONTROL_FAULT_RESET)
         return await self.read_error_code(comm)
